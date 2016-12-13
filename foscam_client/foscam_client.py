@@ -98,7 +98,8 @@ class FoscamClient:
         response_command = socket.recv(4)
         if print_response : self.print_bytes_in_hex(response_command, label='command')
         magic_number = socket.recv(4)
-        assert magic_number == MAGIC_NUMBER_STR
+        if magic_number != None:
+            assert magic_number == MAGIC_NUMBER_STR
         packet_length = socket.recv(4)
         if print_response : self.print_bytes_in_hex(packet_length, label='length')
         packet_length_int = self.bytes_to_int(packet_length)
@@ -223,7 +224,7 @@ class FoscamThread(threading.Thread):
                 sleep(2)
         elif self.task == 'motion detection':
             while True:
-                # receive 1d
+                # receive 6f
                 response_command, packet_length_int = self.foscam_client.read_response_header()
                 if response_command == MOTION_DETECTION_COMMAND_HEX:
                     self.foscam_client.read_response_data(packet_length_int)
@@ -244,13 +245,17 @@ class FoscamThread(threading.Thread):
                     command = '{} -i {} -f image2pipe  -pix_fmt  rgb24 -vcodec  rawvideo  - '.format(settings.FFMPEG_PATH, video_file_path)
                     devnull = open(os.devnull, 'wb')
                     pipe = sp.Popen(command, shell=True, stdout=sp.PIPE, stderr=devnull)
-                    for index in range(0, 23):
-                        # read 1289*730*3 bytes (= 1 frame)
-                        raw_image = pipe.stdout.read(1280 * 720 * 3)
-                        # transform the byte read into a numpy array
-                        image = numpy.fromstring(raw_image, dtype='uint8')
-                        image = image.reshape((720, 1280, 3))
-                        pil_image = Image.fromarray(image)
-                        pil_image.save("{}/frame_{}.jpeg".format(video_file_directory, index))
+                    try:
+                        for index in range(0, 23):
+                            # read 1289*730*3 bytes (= 1 frame)
+                            raw_image = pipe.stdout.read(1280 * 720 * 3)
+                            # transform the byte read into a numpy array
+                            image = numpy.fromstring(raw_image, dtype='uint8')
+                            image = image.reshape((720, 1280, 3))
+                            pil_image = Image.fromarray(image)
+                            pil_image.save("{}/frame_{}.jpeg".format(video_file_directory, index))
+                    except Exception:
+                        pass
                     # throw away the data in the pipe's buffer.
                     pipe.stdout.flush()
+                    pipe.kill()
