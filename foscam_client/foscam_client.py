@@ -265,6 +265,9 @@ class FoscamThread(threading.Thread):
                     pipe.stdout.flush()
                     pipe.kill()
                     if settings.SEND_NOTIFICATION:
-                        json_dict = {"date_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                     "pictures_paths": saved_images_paths}
-                        requests.post(settings.NOTIFICATION_DESTINATION, json.dumps(json_dict))
+                        try:
+                            json_dict = {"date_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                         "pictures_paths": saved_images_paths}
+                            requests.post(settings.NOTIFICATION_DESTINATION, json.dumps(json_dict))
+                        except Exception:
+                            print 'Notification not sent!'
