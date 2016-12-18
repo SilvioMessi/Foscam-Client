@@ -6,6 +6,8 @@ import datetime
 import subprocess as sp
 import numpy
 from PIL import Image
+import requests
+import json
 
 import settings as settings
 
@@ -152,7 +154,7 @@ class FoscamClient:
         if status == False:
             return
         if video_file_name == None:
-            video_file_name = 'video.264'
+            video_file_name = 'video'
         video_file_directory = '{}/{}'.format(self.directory, datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
         if not os.path.exists(video_file_directory):
             os.makedirs(video_file_directory)
@@ -246,6 +248,7 @@ class FoscamThread(threading.Thread):
                     devnull = open(os.devnull, 'wb')
                     pipe = sp.Popen(command, shell=True, stdout=sp.PIPE, stderr=devnull)
                     try:
+                        saved_images_paths = []
                         for index in range(0, 23):
                             # read 1289*730*3 bytes (= 1 frame)
                             raw_image = pipe.stdout.read(1280 * 720 * 3)
@@ -253,9 +256,15 @@ class FoscamThread(threading.Thread):
                             image = numpy.fromstring(raw_image, dtype='uint8')
                             image = image.reshape((720, 1280, 3))
                             pil_image = Image.fromarray(image)
-                            pil_image.save("{}/frame_{}.jpeg".format(video_file_directory, index))
+                            image_path = "{}/frame_{}.jpeg".format(video_file_directory, index)
+                            pil_image.save(image_path)
+                            saved_images_paths.append(image_path)
                     except Exception:
                         pass
                     # throw away the data in the pipe's buffer.
                     pipe.stdout.flush()
                     pipe.kill()
+                    if settings.SEND_NOTIFICATION:
+                        json_dict = {"date_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                     "pictures_paths": saved_images_paths}
+                        requests.post(settings.NOTIFICATION_DESTINATION, json.dumps(json_dict))
